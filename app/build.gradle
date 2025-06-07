@@ -58,6 +58,11 @@ dependencies {
     implementation libs.google.auth.library.oauth2.http
     implementation libs.firebase.admin
 
+    // Add these for FCM v1 API
+    implementation libs.google.auth.library.oauth2.http.v1190
+    implementation libs.okhttp
+    implementation libs.gson
+
 
     //MultiDex
     implementation libs.multidex

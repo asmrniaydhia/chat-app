@@ -22,6 +22,7 @@ import com.example.ppb_proyek.models.User;
 import com.example.ppb_proyek.network.ApiClient;
 import com.example.ppb_proyek.network.ApiService;
 import com.example.ppb_proyek.utilities.Constants;
+import com.example.ppb_proyek.utilities.FCMHelper;
 import com.example.ppb_proyek.utilities.PreferenceManager;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.firebase.firestore.DocumentChange;
@@ -83,6 +84,57 @@ public class ChatActivity extends BaseActivity {
         database = FirebaseFirestore.getInstance();
     }
 
+//    private void sendMessage() {
+//        HashMap<String, Object> message = new HashMap<>();
+//        message.put(Constants.KEY_SENDER_ID, preferenceManager.getString(Constants.KEY_USER_ID));
+//        message.put(Constants.KEY_RECEIVER_ID, receiverUser.id);
+//        message.put(Constants.KEY_MESSAGE, binding.inputMessage.getText().toString());
+//        message.put(Constants.KEY_TIMESTAMP, new Date());
+//        database.collection(Constants.KEY_COLLECTION_CHAT).add(message);
+//        if (conversionId != null) {
+//            updateConversion(binding.inputMessage.getText().toString());
+//        } else {
+//            HashMap<String, Object> conversion = new HashMap<>();
+//            conversion.put(Constants.KEY_SENDER_ID, preferenceManager.getString(Constants.KEY_USER_ID));
+//            conversion.put(Constants.KEY_SENDER_NAME, preferenceManager.getString(Constants.KEY_NAME));
+//            conversion.put(Constants.KEY_SENDER_IMAGE, preferenceManager.getString(Constants.KEY_IMAGE));
+//            conversion.put(Constants.KEY_RECEIVER_ID, receiverUser.id);
+//            conversion.put(Constants.KEY_RECEIVER_NAME, receiverUser.name);
+//            conversion.put(Constants.KEY_RECEIVER_IMAGE, receiverUser.image);
+//            conversion.put(Constants.KEY_LAST_MESSAGE, binding.inputMessage.getText().toString());
+//            conversion.put(Constants.KEY_TIMESTAMP, new Date());
+//            addConversion(conversion);
+//        }
+//        if (!isReceiverAvailable) {
+//            try {
+//                JSONArray tokens = new JSONArray();
+//                tokens.put(receiverUser.token);
+//
+//                JSONObject data = new JSONObject();
+//                data.put(Constants.KEY_USER_ID, preferenceManager.getString(Constants.KEY_USER_ID));
+//                data.put(Constants.KEY_NAME, preferenceManager.getString(Constants.KEY_NAME));
+//                data.put(Constants.KEY_FCM_TOKEN, preferenceManager.getString(Constants.KEY_FCM_TOKEN));
+//                data.put(Constants.KEY_MESSAGE, binding.inputMessage.getText().toString());
+//
+//                JSONObject body = new JSONObject();
+//                body.put(Constants.REMOTE_MSG_DATA, data);
+//                body.put(Constants.REMOTE_MSG_REGISTRATION_IDS, tokens);
+//
+//                sendNotification(body.toString());
+//            } catch (Exception exception) {
+//                showToast(exception.getMessage());
+//            }
+//        }
+//        binding.inputMessage.setText(null);
+//    }
+
+    private void showToast(String message) {
+        Toast.makeText(getApplicationContext(), message, Toast.LENGTH_SHORT).show();
+    }
+
+    // Update the sendMessage() method in ChatActivity.java
+    // Replace the existing sendNotification logic with this:
+
     private void sendMessage() {
         HashMap<String, Object> message = new HashMap<>();
         message.put(Constants.KEY_SENDER_ID, preferenceManager.getString(Constants.KEY_USER_ID));
@@ -90,6 +142,7 @@ public class ChatActivity extends BaseActivity {
         message.put(Constants.KEY_MESSAGE, binding.inputMessage.getText().toString());
         message.put(Constants.KEY_TIMESTAMP, new Date());
         database.collection(Constants.KEY_COLLECTION_CHAT).add(message);
+
         if (conversionId != null) {
             updateConversion(binding.inputMessage.getText().toString());
         } else {
@@ -104,66 +157,72 @@ public class ChatActivity extends BaseActivity {
             conversion.put(Constants.KEY_TIMESTAMP, new Date());
             addConversion(conversion);
         }
+
+        // Send notification using new FCM v1 API
         if (!isReceiverAvailable) {
-            try {
-                JSONArray tokens = new JSONArray();
-                tokens.put(receiverUser.token);
-
-                JSONObject data = new JSONObject();
-                data.put(Constants.KEY_USER_ID, preferenceManager.getString(Constants.KEY_USER_ID));
-                data.put(Constants.KEY_NAME, preferenceManager.getString(Constants.KEY_NAME));
-                data.put(Constants.KEY_FCM_TOKEN, preferenceManager.getString(Constants.KEY_FCM_TOKEN));
-                data.put(Constants.KEY_MESSAGE, binding.inputMessage.getText().toString());
-
-                JSONObject body = new JSONObject();
-                body.put(Constants.REMOTE_MSG_DATA, data);
-                body.put(Constants.REMOTE_MSG_REGISTRATION_IDS, tokens);
-
-                sendNotification(body.toString());
-            } catch (Exception exception) {
-                showToast(exception.getMessage());
-            }
+            sendNotificationV1();
         }
+
         binding.inputMessage.setText(null);
     }
 
-    private void showToast(String message) {
-        Toast.makeText(getApplicationContext(), message, Toast.LENGTH_SHORT).show();
+    private void sendNotificationV1() {
+        try {
+            // Prepare data for notification
+            HashMap<String, String> data = new HashMap<>();
+            data.put(Constants.KEY_USER_ID, preferenceManager.getString(Constants.KEY_USER_ID));
+            data.put(Constants.KEY_NAME, preferenceManager.getString(Constants.KEY_NAME));
+            data.put(Constants.KEY_FCM_TOKEN, preferenceManager.getString(Constants.KEY_FCM_TOKEN));
+            data.put(Constants.KEY_MESSAGE, binding.inputMessage.getText().toString());
+
+            // Send notification using FCMHelper
+            FCMHelper.sendNotification(
+                    receiverUser.token,
+                    preferenceManager.getString(Constants.KEY_NAME),
+                    binding.inputMessage.getText().toString(),
+                    data
+            );
+
+        } catch (Exception exception) {
+            showToast(exception.getMessage());
+        }
     }
 
-    private void sendNotification(String messageBody) {
-        ApiClient.getClient().create(ApiService.class).sendMessage(
-                Constants.getRemoteMsgHeaders(),
-                messageBody
-        ).enqueue(new Callback<String>() {
-            @Override
-            public void onResponse(@NonNull Call<String> call, @NonNull Response<String> response) {
-                if (response.isSuccessful()) {
-                    try {
-                        if (response.body() != null) {
-                            JSONObject responseJson = new JSONObject(response.body());
-                            JSONArray results = responseJson.getJSONArray("results");
-                            if (responseJson.getInt("failure") == 1) {
-                                JSONObject error = (JSONObject) results.get(0);
-                                showToast(error.getString("error"));
-                                return;
-                            }
-                        }
-                    } catch (JSONException e) {
-                        e.printStackTrace();
-                    }
-                    showToast("Notification sent successfully");
-                } else {
-                    showToast("Error: " + response.code());
-                }
-            }
+// Remove the old sendNotification method that uses the deprecated API
 
-            @Override
-            public void onFailure(@NonNull Call<String> call, @NonNull Throwable t) {
-                showToast(t.getMessage());
-            }
-        });
-    }
+//    private void sendNotification(String messageBody) {
+//        ApiClient.getClient().create(ApiService.class).sendMessage(
+//                Constants.getRemoteMsgHeaders(),
+//                messageBody
+//        ).enqueue(new Callback<String>() {
+//            @Override
+//            public void onResponse(@NonNull Call<String> call, @NonNull Response<String> response) {
+//                if (response.isSuccessful()) {
+//                    try {
+//                        if (response.body() != null) {
+//                            JSONObject responseJson = new JSONObject(response.body());
+//                            JSONArray results = responseJson.getJSONArray("results");
+//                            if (responseJson.getInt("failure") == 1) {
+//                                JSONObject error = (JSONObject) results.get(0);
+//                                showToast(error.getString("error"));
+//                                return;
+//                            }
+//                        }
+//                    } catch (JSONException e) {
+//                        e.printStackTrace();
+//                    }
+//                    showToast("Notification sent successfully");
+//                } else {
+//                    showToast("Error: " + response.code());
+//                }
+//            }
+//
+//            @Override
+//            public void onFailure(@NonNull Call<String> call, @NonNull Throwable t) {
+//                showToast(t.getMessage());
+//            }
+//        });
+//    }
 
     private void listenAvailabilityOfReceiver() {
         database.collection(Constants.KEY_COLLECTION_USERS)
