@@ -168,14 +168,12 @@ public class ChatActivity extends BaseActivity {
 
     private void sendNotificationV1() {
         try {
-            // Prepare data for notification
             HashMap<String, String> data = new HashMap<>();
             data.put(Constants.KEY_USER_ID, preferenceManager.getString(Constants.KEY_USER_ID));
             data.put(Constants.KEY_NAME, preferenceManager.getString(Constants.KEY_NAME));
             data.put(Constants.KEY_FCM_TOKEN, preferenceManager.getString(Constants.KEY_FCM_TOKEN));
             data.put(Constants.KEY_MESSAGE, binding.inputMessage.getText().toString());
 
-            // Send notification using FCMHelper
             FCMHelper.sendNotification(
                     receiverUser.token,
                     preferenceManager.getString(Constants.KEY_NAME),
@@ -184,7 +182,7 @@ public class ChatActivity extends BaseActivity {
             );
 
         } catch (Exception exception) {
-            showToast(exception.getMessage());
+            showToast("Error sending notification: " + exception.getMessage());
         }
     }
 
